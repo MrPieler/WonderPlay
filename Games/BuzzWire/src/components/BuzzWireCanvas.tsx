@@ -140,11 +140,19 @@ export function BuzzWireCanvas({ difficulty, onBuzz, onWin }: BuzzWireCanvasProp
     if (!canvas || !ctx) return
     if (size.width <= 0 || size.height <= 0) return
 
+    // Round the CSS size first, then derive the backing store from that same rounded value.
+    // Rounding the backing store from the raw (often fractional) measured size while leaving
+    // the CSS box unrounded lets the two mismatch by a fraction of a device pixel — the browser
+    // then stretches the bitmap to fit, which reads as a soft/blurry canvas on high-DPI screens
+    // like an iPad's (a 1x desktop display hides the same mismatch since there's no scaling to
+    // reveal it).
+    const cssWidth = Math.round(size.width)
+    const cssHeight = Math.round(size.height)
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.round(size.width * dpr)
-    canvas.height = Math.round(size.height * dpr)
-    canvas.style.width = `${size.width}px`
-    canvas.style.height = `${size.height}px`
+    canvas.width = Math.round(cssWidth * dpr)
+    canvas.height = Math.round(cssHeight * dpr)
+    canvas.style.width = `${cssWidth}px`
+    canvas.style.height = `${cssHeight}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     function update() {

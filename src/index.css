@@ -1,2 +1,18 @@
 @import 'tailwindcss';
 @import '../shell/theme/theme.css';
+
+/*
+ * Every screen is built to exactly fill the viewport (dvh) rather than scroll, but on iOS
+ * Safari even a sub-pixel sliver of page overflow is enough to trigger elastic rubber-band
+ * scrolling — which also collapses the address bar, changing the dvh viewport size mid-
+ * interaction. That resize cascades into every game's ResizeObserver-driven layout, so a
+ * ring/piece/ball can visibly shift under your finger while dragging. Locking the page (each
+ * game's own internal scroll areas, e.g. the puzzle tray, use their own local overflow and are
+ * unaffected) removes that whole failure mode.
+ */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
