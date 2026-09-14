@@ -1,6 +1,53 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ThemePicker } from '../theme/ThemePicker'
 import { useSidebarActions } from './SidebarContext'
+
+const MIN_LABEL_FONT_SIZE = 8
+
+/**
+ * A sidebar action's label, still allowed to wrap onto a second line but shrunk whenever a
+ * word is too wide for the button on its own - the rail is narrow (w-16/w-20) and games
+ * register labels of very different lengths ("Mute" vs "Change Difficulty"), so a fixed size
+ * either wastes space or lets a long word overflow the button.
+ */
+function FitLabel({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    const parent = el?.parentElement
+    if (!el || !parent) return
+
+    function fit() {
+      if (!el) return
+      el.style.fontSize = ''
+      el.style.overflowWrap = ''
+      const naturalSize = parseFloat(window.getComputedStyle(el).fontSize)
+
+      let size = naturalSize
+      el.style.fontSize = `${size}px`
+      while (el.scrollWidth > el.clientWidth && size > MIN_LABEL_FONT_SIZE) {
+        size -= 1
+        el.style.fontSize = `${size}px`
+      }
+      // Last resort for a single word that still doesn't fit at the smallest size: break it
+      // mid-word instead of letting it overflow the button.
+      if (el.scrollWidth > el.clientWidth) el.style.overflowWrap = 'break-word'
+    }
+
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(parent)
+    return () => observer.disconnect()
+  }, [text])
+
+  return (
+    <span ref={ref} className="block w-full text-center">
+      {text}
+    </span>
+  )
+}
 
 /**
  * The rail every game lives inside: a way home, the paint pot, and whatever buttons the current
@@ -21,7 +68,7 @@ export function Sidebar() {
         title="WonderPlay home"
         className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-pz-surface text-2xl shadow ring-1 ring-pz-ring transition hover:scale-105 active:scale-95"
       >
-        <span aria-hidden>🧩</span>
+        <span aria-hidden>🎮</span>
       </Link>
 
       <ThemePicker />
@@ -40,7 +87,7 @@ export function Sidebar() {
               : 'bg-pz-surface text-pz-ink ring-pz-ring'
           }`}
         >
-          {action.label}
+          <FitLabel text={action.label} />
         </button>
       ))}
     </nav>
