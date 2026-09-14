@@ -7,14 +7,23 @@ import {
   buildSwatchGradient,
   buildTokens,
   findColorFamily,
+  toRgbTokens,
 } from './colors'
 
 const OKLCH = /^oklch\((-?[\d.]+) ([\d.]+) (-?[\d.]+)(?: \/ ([\d.]+))?\)$/
+const RGB = /^rgba?\((\d{1,3}), (\d{1,3}), (\d{1,3})(?:, ([\d.]+))?\)$/
 
 function parse(value: string) {
   const match = OKLCH.exec(value)
   if (!match) throw new Error(`not an oklch colour: ${value}`)
   return { l: Number(match[1]), c: Number(match[2]), h: Number(match[3]), a: match[4] ? Number(match[4]) : 1 }
+}
+
+function parseRgb(value: string) {
+  const match = RGB.exec(value)
+  if (!match) throw new Error(`not an rgb colour: ${value}`)
+  const [, r, g, b, a] = match
+  return { r: Number(r), g: Number(g), b: Number(b), a: a === undefined ? 1 : Number(a) }
 }
 
 describe('colour families', () => {
@@ -115,13 +124,46 @@ describe('celebration extras', () => {
       const colors = buildConfettiColors(family)
       expect(colors).toHaveLength(5)
       expect(new Set(colors).size).toBe(5)
-      for (const color of colors) expect(() => parse(color)).not.toThrow()
+      for (const color of colors) expect(() => parseRgb(color)).not.toThrow()
     }
   })
 
   test('swatches are a gradient through the family', () => {
     for (const family of COLOR_FAMILIES) {
       expect(buildSwatchGradient(family)).toContain('linear-gradient')
+    }
+  })
+})
+
+describe('toRgbTokens', () => {
+  // Every DOM/canvas-facing colour must be rgb()/rgba(), not this module's internal oklch() —
+  // an engine that can't parse oklch() doesn't fall back to anything, it just drops the colour
+  // (see the comment on oklchStringToRgb in colors.ts), which is exactly the bug this guards.
+  for (const family of COLOR_FAMILIES) {
+    test(`converts every ${family.id} token to a valid, non-oklch rgb colour`, () => {
+      const tokens = toRgbTokens(buildTokens(family))
+      for (const token of THEME_TOKENS) {
+        expect(tokens[token], token).not.toContain('oklch')
+        expect(() => parseRgb(tokens[token]), token).not.toThrow()
+        const { r, g, b } = parseRgb(tokens[token])
+        for (const channel of [r, g, b]) {
+          expect(channel).toBeGreaterThanOrEqual(0)
+          expect(channel).toBeLessThanOrEqual(255)
+        }
+      }
+    })
+  }
+
+  test('keeps translucent tokens translucent after conversion', () => {
+    const tokens = toRgbTokens(buildTokens(findColorFamily('sky')!))
+    for (const token of ['socket-fill', 'socket-stroke', 'overlay'] as const) {
+      expect(parseRgb(tokens[token]).a, token).toBeLessThan(1)
+    }
+  })
+
+  test('the swatch gradient never leaks an oklch() colour', () => {
+    for (const family of COLOR_FAMILIES) {
+      expect(buildSwatchGradient(family)).not.toContain('oklch')
     }
   })
 })

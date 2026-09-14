@@ -4,7 +4,7 @@
  * a half-solved board keeps its pieces exactly where they were.
  */
 
-import { THEME_TOKENS, buildConfettiColors, buildTokens, findColorFamily, type ColorFamily, type ThemeTokens } from './colors'
+import { THEME_TOKENS, buildConfettiColors, buildTokens, findColorFamily, toRgbTokens, type ColorFamily, type ThemeTokens } from './colors'
 import { DEFAULT_CHOICE, type ThemeChoice } from './preference'
 import { findTheme, type Theme } from './themes'
 
@@ -23,7 +23,10 @@ export function resolveTheme(choice: ThemeChoice): ResolvedTheme {
     choice: { themeId: theme.id, colorId: family.id },
     theme,
     family,
-    tokens: buildTokens(family),
+    // rgb(), not the recipe's native oklch() — this is what actually reaches CSS custom
+    // properties and canvas fillStyle/strokeStyle, both of which silently drop oklch() on
+    // browsers that don't parse it (see toRgbTokens).
+    tokens: toRgbTokens(buildTokens(family)),
     confetti: buildConfettiColors(family),
   }
 }

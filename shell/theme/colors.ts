@@ -132,6 +132,71 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
+const OKLCH_PATTERN = /^oklch\((-?[\d.]+) ([\d.]+) (-?[\d.]+)(?: \/ ([\d.]+))?\)$/
+
+/**
+ * Converts an oklch() string to an equivalent rgb()/rgba() string (via the standard OKLab
+ * round-trip: https://bottosson.github.io/posts/oklab/).
+ *
+ * The palette above is designed in OKLCH because it's the one space where "same lightness"
+ * really does look equally light across every hue — that's what lets one recipe serve every
+ * colour family. But oklch() the CSS *syntax* is a much newer addition than the colour space
+ * itself, and isn't understood by every browser this app runs on: on an engine that can't parse
+ * it, a background-color/fill using oklch() doesn't fall back to anything — it's simply invalid,
+ * and the property collapses to black or transparent. That's silent and total: every themed
+ * surface, every SVG illustration fill, every canvas fillStyle assignment breaks the same way,
+ * on a device with no way to tell you why the page it's now grey and black.
+ *
+ * Converting here, at the boundary where a colour actually leaves this module for the DOM or a
+ * canvas context, keeps the perceptual-lightness math everywhere above while guaranteeing every
+ * colour that reaches the browser is a format every rendering engine has understood since CSS2.
+ */
+function oklchStringToRgb(value: string): string {
+  const match = OKLCH_PATTERN.exec(value)
+  if (!match) throw new Error(`not an oklch colour: ${value}`)
+  const [, l, c, h, a] = match
+  return oklchToRgbString(Number(l), Number(c), Number(h), a === undefined ? undefined : Number(a))
+}
+
+function oklchToRgbString(l: number, c: number, h: number, a?: number): string {
+  const hRad = (h * Math.PI) / 180
+  const labA = c * Math.cos(hRad)
+  const labB = c * Math.sin(hRad)
+
+  const l_ = l + 0.3963377774 * labA + 0.2158037573 * labB
+  const m_ = l - 0.1055613458 * labA - 0.0638541728 * labB
+  const s_ = l - 0.0894841775 * labA - 1.291485548 * labB
+
+  const l3 = l_ ** 3
+  const m3 = m_ ** 3
+  const s3 = s_ ** 3
+
+  const rLin = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3
+  const gLin = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
+  const bLin = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3
+
+  const r = linearToSrgbByte(rLin)
+  const g = linearToSrgbByte(gLin)
+  const b = linearToSrgbByte(bLin)
+
+  return a === undefined ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${a})`
+}
+
+/** Clamps into gamut (the recipe above can occasionally ask for a chroma sRGB can't reach) and
+ *  applies the sRGB transfer function, landing on a 0-255 byte. */
+function linearToSrgbByte(linear: number): number {
+  const clamped = Math.min(1, Math.max(0, linear))
+  const srgb = clamped <= 0.0031308 ? clamped * 12.92 : 1.055 * clamped ** (1 / 2.4) - 0.055
+  return Math.round(srgb * 255)
+}
+
+/** Every token, converted from this module's internal oklch() strings to rgb()/rgba() — what
+ *  should actually reach a CSS custom property or a canvas fillStyle/strokeStyle. See
+ *  oklchStringToRgb for why. */
+export function toRgbTokens(tokens: ThemeTokens): ThemeTokens {
+  return Object.fromEntries(THEME_TOKENS.map((token) => [token, oklchStringToRgb(tokens[token])])) as ThemeTokens
+}
+
 /** Below this the accent is dark enough for white labels; above it, labels go dark instead. */
 const LIGHT_ACCENT_THRESHOLD = 0.66
 
@@ -158,17 +223,18 @@ function accentInkFor(accentLightness: number): [number, number] {
   return accentLightness >= LIGHT_ACCENT_THRESHOLD ? [0.2, 0.05] : [0.99, 0.008]
 }
 
-/** Five festive colours that still belong to the chosen family, for the winning confetti. */
+/** Five festive colours that still belong to the chosen family, for the winning confetti —
+ *  rendered as DOM element backgrounds, so rgb() like every other exported colour. */
 export function buildConfettiColors(family: ColorFamily): string[] {
   const lightness = family.scheme === 'dark' ? 0.78 : 0.7
   return [0, 42, -42, 150, 208].map((offset) => {
     const hue = (family.hue + offset + 360) % 360
-    return `oklch(${lightness} ${round(0.18 * Math.max(family.chroma, 0.8))} ${hue})`
+    return oklchToRgbString(lightness, round(0.18 * Math.max(family.chroma, 0.8)), hue)
   })
 }
 
 /** The picker swatch: a little sweep through the family so each colour reads as a whole world. */
 export function buildSwatchGradient(family: ColorFamily): string {
-  const tokens = buildTokens(family)
+  const tokens = toRgbTokens(buildTokens(family))
   return `linear-gradient(135deg, ${tokens['bg-deep']} 0%, ${tokens.accent} 55%, ${tokens['accent-strong']} 100%)`
 }

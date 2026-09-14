@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { applyTheme, cssVarName, resolveTheme } from './apply'
-import { THEME_TOKENS, buildTokens, findColorFamily } from './colors'
+import { THEME_TOKENS, buildTokens, findColorFamily, toRgbTokens } from './colors'
 import { DEFAULT_CHOICE } from './preference'
 import { THEMES, findTheme } from './themes'
 
@@ -9,7 +9,7 @@ describe('resolveTheme', () => {
     const resolved = resolveTheme({ themeId: 'dinos', colorId: 'grape' })
     expect(resolved.theme.id).toBe('dinos')
     expect(resolved.family.id).toBe('grape')
-    expect(resolved.tokens).toEqual(buildTokens(findColorFamily('grape')!))
+    expect(resolved.tokens).toEqual(toRgbTokens(buildTokens(findColorFamily('grape')!)))
   })
 
   test('falls back rather than crashing on an unknown choice', () => {

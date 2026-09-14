@@ -27,29 +27,39 @@
   --color-pz-shadow: var(--pz-shadow);
 }
 
-/* First-paint fallback (the default look) for the instant before the theme module runs. */
+/*
+ * First-paint fallback (the default look) for the instant before the theme module runs.
+ * Plain rgb()/rgba(), not oklch() — deliberately. The theme module (shell/theme/colors.ts)
+ * does all its actual colour math in OKLCH because it's the one space where "same lightness"
+ * looks equally light across every hue, but oklch() the CSS syntax isn't understood by every
+ * browser this app runs on. On an engine that can't parse it there's no fallback: the
+ * declaration is simply invalid, and the surface it paints collapses to black or transparent —
+ * which is exactly what these values are here to prevent, so they can't be written in the one
+ * format that risks it. These are the same numbers as colors.ts's LIGHT_RECIPE at hue 300,
+ * converted once by hand with the identical oklch->sRGB math colors.ts uses at runtime.
+ */
 :root {
-  --pz-bg: oklch(0.965 0.045 300);
-  --pz-bg-deep: oklch(0.885 0.085 300);
-  --pz-bg-glow: oklch(0.99 0.03 300);
-  --pz-surface: oklch(0.995 0.008 300);
-  --pz-surface-soft: oklch(0.955 0.03 300);
-  --pz-ring: oklch(0.85 0.06 300);
-  --pz-ink: oklch(0.34 0.1 300);
-  --pz-ink-soft: oklch(0.48 0.08 300);
-  --pz-ink-faint: oklch(0.62 0.06 300);
-  --pz-accent: oklch(0.56 0.17 300);
-  --pz-accent-strong: oklch(0.47 0.17 300);
-  --pz-accent-soft: oklch(0.93 0.06 300);
-  --pz-accent-ink: oklch(0.99 0.008 300);
-  --pz-tray: oklch(0.93 0.045 300);
-  --pz-board: oklch(0.99 0.008 300);
-  --pz-socket-fill: oklch(0.34 0.1 300 / 0.07);
-  --pz-socket-stroke: oklch(0.34 0.1 300 / 0.25);
-  --pz-socket-active-fill: oklch(0.56 0.17 300 / 0.3);
-  --pz-socket-active-stroke: oklch(0.56 0.17 300);
-  --pz-overlay: oklch(0.3 0.08 300 / 0.62);
-  --pz-shadow: oklch(0.3 0.08 300 / 0.25);
+  --pz-bg: rgb(248, 237, 255);
+  --pz-bg-deep: rgb(225, 205, 255);
+  --pz-bg-glow: rgb(255, 248, 255);
+  --pz-surface: rgb(254, 252, 255);
+  --pz-surface-soft: rgb(243, 236, 255);
+  --pz-ring: rgb(211, 198, 240);
+  --pz-ink: rgb(65, 41, 99);
+  --pz-ink-soft: rgb(101, 83, 132);
+  --pz-ink-faint: rgb(139, 126, 165);
+  --pz-accent: rgb(133, 87, 200);
+  --pz-accent-strong: rgb(107, 59, 170);
+  --pz-accent-soft: rgb(238, 224, 255);
+  --pz-accent-ink: rgb(252, 251, 255);
+  --pz-tray: rgb(236, 226, 255);
+  --pz-board: rgb(252, 251, 255);
+  --pz-socket-fill: rgba(65, 41, 99, 0.07);
+  --pz-socket-stroke: rgba(65, 41, 99, 0.25);
+  --pz-socket-active-fill: rgba(133, 87, 200, 0.3);
+  --pz-socket-active-stroke: rgb(133, 87, 200);
+  --pz-overlay: rgba(52, 35, 79, 0.62);
+  --pz-shadow: rgba(52, 35, 79, 0.25);
 }
 
 /*

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { ThemePicker } from './ThemePicker'
 import { ThemeProvider } from './ThemeProvider'
 import { ThemedBackdrop } from './ThemedBackdrop'
-import { buildTokens, findColorFamily } from './colors'
+import { buildTokens, findColorFamily, toRgbTokens } from './colors'
 import { cssVarName } from './apply'
 import { STORAGE_KEY } from './preference'
 import { THEMES } from './themes'
@@ -33,7 +33,7 @@ afterEach(() => {
 describe('ThemePicker', () => {
   test('paints the chosen look onto the page as soon as it mounts', () => {
     renderPicker({ themeId: 'space', colorId: 'midnight' })
-    expect(currentVar('bg')).toBe(buildTokens(findColorFamily('midnight')!).bg)
+    expect(currentVar('bg')).toBe(toRgbTokens(buildTokens(findColorFamily('midnight')!)).bg)
     expect(document.documentElement.dataset.pzTheme).toBe('space')
   })
 
@@ -60,7 +60,7 @@ describe('ThemePicker', () => {
     fireEvent.click(screen.getByRole('radio', { name: /under the sea/i }))
 
     expect(document.documentElement.dataset.pzTheme).toBe('ocean')
-    expect(currentVar('bg')).toBe(buildTokens(findColorFamily('mint')!).bg)
+    expect(currentVar('bg')).toBe(toRgbTokens(buildTokens(findColorFamily('mint')!)).bg)
   })
 
   test('picking a colour repaints without leaving the world', () => {
@@ -69,7 +69,7 @@ describe('ThemePicker', () => {
     fireEvent.click(screen.getByRole('radio', { name: /grass green/i }))
 
     expect(document.documentElement.dataset.pzTheme).toBe('cars')
-    expect(currentVar('accent')).toBe(buildTokens(findColorFamily('grass')!).accent)
+    expect(currentVar('accent')).toBe(toRgbTokens(buildTokens(findColorFamily('grass')!)).accent)
   })
 
   test('the picker itself is repainted by the pick, so it never clashes with the new look', () => {
