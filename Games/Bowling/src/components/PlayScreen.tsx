@@ -51,7 +51,7 @@ export function PlayScreen({ difficulty, onPlayAgain, onChangeDifficulty }: Play
   })
   useSidebarAction({
     id: 'bowling-bumpers',
-    label: bumpers ? 'Sideguards: On' : 'Sideguards: Off',
+    label: 'Sideguard',
     pressed: bumpers,
     onClick: toggleBumpers,
   })

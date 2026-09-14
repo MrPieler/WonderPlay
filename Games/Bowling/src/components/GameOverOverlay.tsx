@@ -71,7 +71,7 @@ export function GameOverOverlay({ score, best, isNewBest, onPlayAgain, onChangeD
             onClick={onChangeDifficulty}
             className="rounded-full bg-pz-surface px-6 py-3 font-semibold text-pz-ink shadow ring-1 ring-pz-ring transition hover:bg-pz-surface-soft active:scale-95"
           >
-            Change difficulty
+            Difficulty
           </button>
         </div>
       </div>
