@@ -31,6 +31,17 @@ export interface GenerateWirePathOptions {
 
 const SAMPLE_STEP_PX = 3
 
+/** Minimum direction changes a generated route must have before it's considered "winding enough" to show. */
+const MIN_TURNS = 8
+
+/**
+ * Hard cap on randomized attempts before settling for the best one found. Each attempt is itself
+ * bounded (see `findWirePath`'s own guard), so this exists only to stop generation from ever
+ * hanging outright on a screen size nobody anticipated — every canvas size actually exercised
+ * (including the narrow, 5-row-minimum case) clears MIN_TURNS in a small fraction of this budget.
+ */
+const MAX_GENERATION_ATTEMPTS = 300
+
 /**
  * Finds the closest point on the wire to (x, y) by scanning every sample. Path lengths in this
  * game top out at a few hundred samples, so a linear scan stays well under a millisecond — fast
@@ -83,7 +94,7 @@ export function generateWirePath({ width, height, config = MAP_CONFIG, rand = cr
 
   // On a small canvas the grid may be too tight to fit the full target length once the
   // self-avoidance clearance is honored — scale the target down to what the grid can actually
-  // hold instead of repeatedly failing and falling back to a boring straight line.
+  // hold instead of repeatedly failing to find any route at all.
   const availableCells = grid.cols * grid.rows
   let maxSteps = Math.max(8, Math.min(config.maxSteps, Math.floor(availableCells * 0.4)))
   let minSteps = Math.max(6, Math.min(config.minSteps, maxSteps - 2))
@@ -91,18 +102,35 @@ export function generateWirePath({ width, height, config = MAP_CONFIG, rand = cr
   // A self-avoiding route of one *exact* target length between two fixed, far-apart points is a
   // genuinely hard search to complete — hard enough that a bounded backtracking attempt can run
   // out of budget without ever proving one doesn't exist, even though a shorter target on the
-  // very same grid succeeds easily. Rather than gamble the whole map on one ambitious length,
-  // retry with a progressively shorter (but still well past a direct line) target until one
-  // lands, before ever falling back to a boring straight wire.
-  let cells: Cell[] | null = null
-  for (let rung = 0; rung < 6 && !cells; rung++) {
-    cells = findWirePath(grid, { ...config, minSteps, maxSteps }, rand)
-    minSteps = Math.max(6, Math.floor(minSteps * 0.8))
-    maxSteps = Math.max(minSteps + 2, Math.floor(maxSteps * 0.85))
+  // very same grid succeeds easily. And a found route isn't good enough just because it's
+  // non-null, either — on a cramped grid the search can legitimately succeed with a route that's
+  // short on turns, including in the degenerate case the dead-straight line between start and end.
+  //
+  // So there is no predefined fallback shape: on a stubborn canvas the player just gets a route
+  // built from more randomized attempts than usual, never a hand-built one. The target length only
+  // shrinks once repeated attempts prove outright that the grid can't fit it (three attempts in a
+  // row coming back null) — shrinking in response to a route that's merely too straight would only
+  // make MIN_TURNS harder to reach, not easier, since a shorter route has less room to turn in.
+  let best: Cell[] | null = null
+  let nullStreak = 0
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
+    const found = findWirePath(grid, { ...config, minSteps, maxSteps }, rand)
+    if (!found) {
+      nullStreak++
+      if (nullStreak >= 3) {
+        minSteps = Math.max(6, minSteps - 2)
+        maxSteps = Math.max(minSteps + 2, maxSteps - 2)
+        nullStreak = 0
+      }
+      continue
+    }
+    nullStreak = 0
+    if (!best || countTurns(found) > countTurns(best)) best = found
+    if (countTurns(best) >= MIN_TURNS) break
   }
-  cells ??= fallbackCells(grid)
+  if (!best) throw new Error('generateWirePath: no valid route found within the attempt budget')
 
-  const points = cells.map((c) => cellCenter(c, grid))
+  const points = best.map((c) => cellCenter(c, grid))
   const cornerRadius = config.cornerRadiusFactor * grid.cellSize
   return buildSmoothPath(points, cornerRadius)
 }
@@ -242,6 +270,18 @@ function isNear(a: Cell, b: Cell): boolean {
 
 function directionBetween(a: Cell, b: Cell): Dir {
   return [b.col - a.col, b.row - a.row]
+}
+
+/** Counts direction changes along a cell path — 0 for a dead-straight line. */
+function countTurns(cells: Cell[]): number {
+  let turns = 0
+  let lastDir: Dir | null = null
+  for (let i = 1; i < cells.length; i++) {
+    const dir = directionBetween(cells[i - 1], cells[i])
+    if (lastDir && (dir[0] !== lastDir[0] || dir[1] !== lastDir[1])) turns++
+    lastDir = dir
+  }
+  return turns
 }
 
 function centroidOf(cells: Cell[]): { col: number; row: number } {
@@ -399,14 +439,6 @@ function findWirePath(grid: GridInfo, config: MapConfig, rand: () => number): Ce
   }
 
   return null
-}
-
-/** A trivially valid straight-line path between the fixed start/end, used only if the random walk can't find room (should be rare). */
-function fallbackCells(grid: GridInfo): Cell[] {
-  const { start, end } = anchorCells(grid)
-  const cells: Cell[] = []
-  for (let c = start.col; c <= end.col; c++) cells.push({ col: c, row: start.row })
-  return cells
 }
 
 function sub(a: Point, b: Point): Point {

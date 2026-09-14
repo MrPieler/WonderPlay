@@ -133,4 +133,42 @@ describe('generateWirePath', () => {
     expect(MAP_CONFIG.minSteps).toBeGreaterThanOrEqual(20)
     expect(MAP_CONFIG.straightBias).toBeLessThan(1)
   })
+
+  test('never produces a straight (or nearly-straight) wire, even on a cramped, wide-short canvas', () => {
+    // A very wide, short canvas leaves the walking grid with few rows (5, the minimum computeGrid
+    // allows), which is the shape most likely to make the randomized search struggle to find a
+    // winding route — this exercises that exact scenario.
+    const width = 2400
+    const height = 260
+    for (let seed = 0; seed < 20; seed++) {
+      const path = generateWirePath({ width, height, rand: createRandom(seed) })
+
+      let maxYDeviation = 0
+      for (const s of path.samples) maxYDeviation = Math.max(maxYDeviation, Math.abs(s.y - path.start.y))
+      expect(maxYDeviation).toBeGreaterThan(20)
+
+      let turns = 0
+      const STEP = 8
+      for (let i = STEP; i < path.samples.length - STEP; i += STEP) {
+        const a = path.samples[i - STEP]
+        const b = path.samples[i + STEP]
+        let delta = Math.abs(b.angle - a.angle)
+        if (delta > Math.PI) delta = 2 * Math.PI - delta
+        if (delta > 0.3) turns++
+      }
+      expect(turns).toBeGreaterThan(0)
+
+      // Also make sure the route doesn't crowd itself — turns spaced closely on a cramped grid
+      // must still stay far enough apart that the ring can't ambiguously touch two strands.
+      const minGapIndex = Math.floor(path.samples.length * 0.08)
+      let minDist = Infinity
+      for (let i = 0; i < path.samples.length; i += 5) {
+        for (let j = i + minGapIndex; j < path.samples.length; j += 5) {
+          const d = Math.hypot(path.samples[i].x - path.samples[j].x, path.samples[i].y - path.samples[j].y)
+          if (d < minDist) minDist = d
+        }
+      }
+      expect(minDist).toBeGreaterThan(MAX_TOLERANCE * 2)
+    }
+  })
 })
