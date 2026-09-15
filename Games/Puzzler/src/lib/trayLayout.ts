@@ -6,10 +6,15 @@ export interface TrayScale {
 const MIN_SCALE = 0.18
 const MAX_SCALE = 1
 
-/** How much adjacent tray pieces overlap, as a fraction of piece box size (0 = edge-to-edge, higher = a denser pile). */
+/**
+ * How much adjacent tray pieces overlap, as a fraction of piece box size (0 = edge-to-edge,
+ * higher = a denser pile). Which one applies depends on the shape the tray has been given, not
+ * on the size of the screen: a tray stacked below the board is a wide, shallow strip with room
+ * to spread pieces out, while one beside the board is a narrow column that has to pile them up.
+ */
 export const TRAY_OVERLAP = {
-  mobile: 0.14,
-  desktop: 0.42,
+  below: 0.14,
+  beside: 0.42,
 } as const
 
 function pitchOf(size: number, overlap: number): number {

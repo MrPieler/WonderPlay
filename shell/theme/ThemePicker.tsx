@@ -45,7 +45,7 @@ export function ThemePicker() {
             if (event.target === event.currentTarget) setIsOpen(false)
           }}
         >
-          <div className="flex max-h-[88vh] w-full max-w-3xl flex-col gap-4 overflow-y-auto rounded-3xl bg-pz-surface p-5 shadow-2xl ring-1 ring-pz-ring">
+          <div className="flex max-h-[88dvh] w-full max-w-3xl flex-col gap-4 overflow-y-auto overscroll-contain rounded-3xl bg-pz-surface p-5 shadow-2xl ring-1 ring-pz-ring">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-bold text-pz-ink sm:text-2xl">Pick a look!</h2>
               <div className="flex items-center gap-2">

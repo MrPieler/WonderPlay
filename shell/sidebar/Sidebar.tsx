@@ -60,7 +60,7 @@ export function Sidebar() {
   return (
     <nav
       aria-label="Game menu"
-      className="flex w-16 flex-none flex-col items-center gap-2 p-2 sm:w-20 sm:gap-3 sm:p-3"
+      className="flex w-16 flex-none flex-col items-center gap-2 overflow-y-auto overscroll-contain p-2 sm:w-20 sm:gap-3 sm:p-3"
     >
       <Link
         to="/"

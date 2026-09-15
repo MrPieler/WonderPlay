@@ -195,7 +195,7 @@ export function BuzzWireCanvas({ difficulty, onBuzz, onWin }: BuzzWireCanvasProp
     }
 
     function draw(now: number) {
-      ctx!.clearRect(0, 0, size.width, size.height)
+      ctx!.clearRect(0, 0, cssWidth, cssHeight)
       const path = pathRef.current
       if (!path) return
 
@@ -203,16 +203,18 @@ export function BuzzWireCanvas({ difficulty, onBuzz, onWin }: BuzzWireCanvasProp
       drawWire(ctx!, path)
       drawPad(ctx!, path.start.x, path.start.y, '#4caf7d', 'START')
       drawPad(ctx!, path.end.x, path.end.y, '#e2894a', 'FINISH')
-      drawProgressBar(ctx!, size.width, ringRef.current.maxT, accentColor)
+      drawProgressBar(ctx!, cssWidth, ringRef.current.maxT, accentColor)
       drawIdleHint(ctx!, ringRef.current, config.tolerance, now, accentColor)
       drawRing(ctx!, ringRef.current, config.tolerance, accentColor)
     }
 
     let raf = 0
     function frame(now: number) {
+      // Queued before the work, not after: a draw call that throws on some engine must not be
+      // able to stop the loop outright and freeze the game on a half-painted frame.
+      raf = requestAnimationFrame(frame)
       update()
       draw(now)
-      raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
 
@@ -313,16 +315,44 @@ function drawProgressBar(ctx: CanvasRenderingContext2D, width: number, progress:
 
   ctx.save()
   ctx.fillStyle = 'rgba(0,0,0,0.08)'
-  ctx.beginPath()
-  ctx.roundRect(margin, margin, barWidth, barHeight, barHeight / 2)
+  traceRoundedRect(ctx, margin, margin, barWidth, barHeight, barHeight / 2)
   ctx.fill()
 
   const filled = Math.max(barHeight, barWidth * progress)
   ctx.fillStyle = accentColor
-  ctx.beginPath()
-  ctx.roundRect(margin, margin, filled, barHeight, barHeight / 2)
+  traceRoundedRect(ctx, margin, margin, filled, barHeight, barHeight / 2)
   ctx.fill()
   ctx.restore()
+}
+
+/**
+ * Traces a rounded rectangle from arcs rather than calling ctx.roundRect.
+ *
+ * roundRect only reached Safari in 16.4, and an iPad older than that doesn't quietly ignore the
+ * call - it throws. That aborted the whole draw pass partway through, which is why such an iPad
+ * showed the wire and the start/finish pads (drawn before the progress bar) but no ring at all
+ * (drawn after it), and why the animation never recovered.
+ */
+function traceRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2))
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + width - r, y)
+  ctx.arcTo(x + width, y, x + width, y + r, r)
+  ctx.lineTo(x + width, y + height - r)
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r)
+  ctx.lineTo(x + r, y + height)
+  ctx.arcTo(x, y + height, x, y + height - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
 }
 
 function drawIdleHint(ctx: CanvasRenderingContext2D, ring: RingState, tolerance: number, now: number, accentColor: string) {

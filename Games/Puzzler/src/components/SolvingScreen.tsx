@@ -16,7 +16,6 @@ import {
   type TrayPosition,
 } from '../lib/trayLayout'
 import { useMeasuredSize } from '../../../../shell/hooks/useMeasuredSize'
-import { useMediaQuery } from '../../../../shell/hooks/useMediaQuery'
 import { useSidebarAction } from '../../../../shell'
 import { PIECE_BLEED, PuzzlePieceSvg } from './PuzzlePieceSvg'
 import { PuzzleBoard } from './PuzzleBoard'
@@ -50,30 +49,41 @@ export function SolvingScreen({
   const [rowWrapperRef, rowBox] = useMeasuredSize({ width: 900, height: 600 })
   const [boardWrapperRef, boardBox] = useMeasuredSize({ width: 320, height: 320 })
   const [trayWrapperRef, trayBox] = useMeasuredSize({ width: 260, height: 260 })
-  const isDesktop = useMediaQuery('(min-width: 768px)')
   const imageAspectRatio = image.width / image.height
+
+  // Where the tray goes is decided by the *shape* of the play area, not by a width breakpoint.
+  // The spare room a landscape screen has is beside the board and a portrait screen's is below
+  // it, and that is precisely what turning a tablet swaps over - so measuring the area answers
+  // the question directly, in one place, for every screen and both orientations. A width
+  // breakpoint gets a portrait tablet wrong in particular: it's comfortably "wide" by any
+  // phone-vs-desktop measure, yet squeezing the board into a column beside the tray there
+  // leaves the puzzle small with a tall band of empty space under it.
+  const isTrayBeside = rowBox.width >= rowBox.height
 
   // Total piece count, not how many remain unplaced - sizing off a fixed count keeps the
   // board and tray a stable size as pieces get placed, instead of growing to fill the space
   // each placement frees up (which read as the whole puzzle "resizing" while solving).
   const totalPieces = pieces.length
-  const trayOverlap = isDesktop ? TRAY_OVERLAP.desktop : TRAY_OVERLAP.mobile
+  const trayOverlap = isTrayBeside ? TRAY_OVERLAP.beside : TRAY_OVERLAP.below
 
   // Contain-fit the board inside whatever space is left (never crop to width alone), so
   // the whole board is always visible with no scrolling, on any screen size/orientation.
+  // Strictly contain-fit: the board's height is boardWidth / imageAspectRatio, so honouring
+  // both terms here is what guarantees it. There is deliberately no minimum piece size on top
+  // of this - a floor that the available space can't actually satisfy doesn't make pieces
+  // easier to grab, it just pushes the board past the edges of a container that clips, and a
+  // clipped row of pieces is unreachable rather than merely small.
   const widthFromHeight = boardBox.height > 0 ? boardBox.height * imageAspectRatio : boardBox.width
-  const fitWidth = Math.min(boardBox.width, widthFromHeight) || boardBox.width
-  const boardWidth = fitWidth / grid.cols < 40 ? 40 * grid.cols : fitWidth
+  const boardWidth = Math.max(0, Math.min(boardBox.width, widthFromHeight))
   const natural = computeCellSize(image.width, image.height, grid, boardWidth)
 
-  // On desktop the tray sits beside the board, so give it however much width it actually
-  // needs to show every piece at full size (up to a capped share of the row, kept fairly
-  // narrow so the tray reads as a compact overlapping pile rather than a wide spread-out
-  // sidebar) instead of a one-size-fits-all sidebar - a fixed narrow sidebar either wastes
-  // space for a few pieces or (worse, for grid shapes like the 1x3/3x1 a 3-piece puzzle
-  // always uses, whose cells are far from square) forces pieces, and by extension the whole
-  // board, to shrink far more than necessary just because a handful of them don't fit
-  // shoulder-to-shoulder in a narrow column.
+  // When the tray sits beside the board, give it however much width it actually needs to show
+  // every piece at full size (up to a capped share of the row, kept fairly narrow so the tray
+  // reads as a compact overlapping pile rather than a wide spread-out sidebar) instead of a
+  // one-size-fits-all sidebar - a fixed narrow sidebar either wastes space for a few pieces
+  // or (worse, for grid shapes like the 1x3/3x1 a 3-piece puzzle always uses, whose cells are
+  // far from square) forces pieces, and by extension the whole board, to shrink far more than
+  // necessary just because a handful of them don't fit shoulder-to-shoulder in a narrow column.
   // Tray fit math must work in rendered piece *box* size (cell size plus the PIECE_BLEED
   // margin baked into every piece's SVG viewBox), not raw cell size - a piece's actual
   // on-screen footprint in the tray is 1.6x its cell size, and sizing off the smaller
@@ -81,12 +91,15 @@ export function SolvingScreen({
   const naturalBoxWidth = natural.width * (1 + 2 * PIECE_BLEED)
   const naturalBoxHeight = natural.height * (1 + 2 * PIECE_BLEED)
 
-  let desktopTrayWidthPx: number | undefined
-  if (isDesktop) {
+  let sideTrayWidthPx: number | undefined
+  if (isTrayBeside) {
     // Measured off the stable outer row container, not off the board/tray split itself -
     // sizing the tray from its own rendered width would feed back into this same
     // calculation next render and let it creep wider than intended.
-    const maxTrayWidth = Math.max(200, rowBox.width * 0.42)
+    // The 200px floor keeps a tray usable on a normal screen, but it has to stay a *share* of
+    // the row as well: on a play area only a few hundred pixels across, a flat 200px column is
+    // half the puzzle's space, and the board is the part that should win that argument.
+    const maxTrayWidth = Math.min(rowBox.width * 0.45, Math.max(200, rowBox.width * 0.42))
     const minTrayWidth = Math.min(260, rowBox.width * 0.22) || 260
     const idealTrayWidth = computeIdealTrayWidth(
       rowBox.height,
@@ -96,7 +109,7 @@ export function SolvingScreen({
       maxTrayWidth,
       trayOverlap,
     )
-    desktopTrayWidthPx = Math.min(maxTrayWidth, Math.max(minTrayWidth, idealTrayWidth))
+    sideTrayWidthPx = Math.min(maxTrayWidth, Math.max(minTrayWidth, idealTrayWidth))
   }
 
   // The board always renders at its full contain-fit size - the puzzle itself should take up
@@ -192,9 +205,15 @@ export function SolvingScreen({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-dvh w-full overflow-hidden">
-        <div ref={rowWrapperRef} className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row">
-          <div ref={boardWrapperRef} className="flex min-h-0 flex-[3] items-center justify-center md:flex-1">
+      <div className="flex h-full w-full overflow-hidden">
+        <div
+          ref={rowWrapperRef}
+          className={`flex min-h-0 min-w-0 flex-1 gap-2 p-2 ${isTrayBeside ? 'flex-row' : 'flex-col'}`}
+        >
+          <div
+            ref={boardWrapperRef}
+            className={`flex min-h-0 min-w-0 items-center justify-center ${isTrayBeside ? 'flex-1' : 'flex-[3]'}`}
+          >
             <PuzzleBoard
               image={image}
               grid={grid}
@@ -215,7 +234,8 @@ export function SolvingScreen({
             boxWidth={boxWidth}
             boxHeight={boxHeight}
             containerRef={trayWrapperRef}
-            desktopWidthPx={desktopTrayWidthPx}
+            beside={isTrayBeside}
+            sideWidthPx={sideTrayWidthPx}
           />
         </div>
       </div>

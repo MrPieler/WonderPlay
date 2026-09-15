@@ -19,7 +19,7 @@ export function PlayScreen({ difficulty, onNewMap, onChangeDifficulty }: PlayScr
   useSidebarAction({ id: 'buzzwire-difficulty', label: 'Change Difficulty', onClick: onChangeDifficulty })
 
   return (
-    <div className="flex h-dvh w-full flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <span aria-hidden className="text-2xl">

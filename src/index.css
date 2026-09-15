@@ -16,3 +16,14 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
+/*
+ * iOS "text autosizing" grows the text inside a block once that block gets wide enough, which
+ * on a tablet means every label quietly jumps a size the moment you turn it to landscape - a
+ * rotation then reads as the whole layout changing size, not just reflowing. Pinning the
+ * adjustment to 100% leaves the type exactly where the design put it in both orientations.
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}

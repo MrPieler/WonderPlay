@@ -65,7 +65,7 @@ export function PlayScreen({ difficulty, onPlayAgain, onChangeDifficulty }: Play
   }
 
   return (
-    <div className="flex h-dvh w-full flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-3 sm:justify-between">
         <div className="flex items-center gap-2 rounded-full bg-pz-surface px-4 py-2 shadow ring-1 ring-pz-ring">
           <span aria-hidden className="text-xl">
